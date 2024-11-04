@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:news_app/model/sources_Response/Source.dart';
-import 'package:news_app/shared/api/api_manager.dart';
+import 'package:provider/provider.dart';
 
 import '../../../shared/reusable_widget/news_widget.dart';
+import '../../category_details/viewModel/CategoryDetailsViewModel.dart';
 class NewsListWidget extends StatefulWidget {
    NewsListWidget({super.key,required this.source});
    Source source;
@@ -15,6 +16,10 @@ class _NewsListWidgetState extends State<NewsListWidget> {
    late ScrollController scrollController;
    @override
   void initState() {
+     super.initState();
+     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+       context.read<CategoryDetailsViewModel>().getNews(widget.source.id??"", page);
+     });
      scrollController = ScrollController();
      scrollController.addListener(() {
        if(scrollController.position.atEdge){
@@ -35,19 +40,18 @@ class _NewsListWidgetState extends State<NewsListWidget> {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: FutureBuilder(future: ApiManager.getNews(widget.source.id!,page),
-        builder: (BuildContext context, AsyncSnapshot<dynamic> snapshot) {
-        if(snapshot.connectionState == ConnectionState.waiting){
+      child: Consumer<CategoryDetailsViewModel>(builder: (BuildContext context, CategoryDetailsViewModel viewModel, Widget? child) {
+        if(viewModel.showNewsLoading){
           return Center(child: CircularProgressIndicator(),);
-        }else if(snapshot.hasError || snapshot.data?.status == 'error'){
+        }else if(viewModel.newsErrorMessage != null){
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-            Text(snapshot.data?.message??snapshot.error.toString()),
-            ElevatedButton(onPressed: () {}, child: Text("Try Again"))
-          ],);
-        }else{
-          var articles = snapshot.data?.articles??[];
+              Text(viewModel.newsErrorMessage??""),
+              ElevatedButton(onPressed: () {}, child: Text("Try Again"))
+            ],);
+        }
+        var articles = viewModel.newsList;
           if(articles.isEmpty){
             return Center(child: Text("No Sources Found"));
           }else{
@@ -60,7 +64,7 @@ class _NewsListWidgetState extends State<NewsListWidget> {
                 itemCount: articles.length);
           }
         }
-        },),
+      ,),
     );
   }
 }
