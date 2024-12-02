@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:news_app/model/category_model/categoeryItemModel.dart';
 import 'package:news_app/shared/reusable_widget/tabBar_Item.dart';
+import 'package:news_app/ui/category_details/view_model/CategoryDetailsViewModel.dart';
 import 'package:news_app/ui/home/categories_widget/news_list_widget.dart';
 
-import '../../shared/api/api_manager.dart';
 class CategoryDetails extends StatefulWidget {
-  CategoryDetails({super.key,required this.category});
+  CategoryDetails({super.key, required this.category});
   CategoryItemModel category;
 
   @override
@@ -14,46 +15,89 @@ class CategoryDetails extends StatefulWidget {
 
 class _CategoryDetailsState extends State<CategoryDetails> {
   int  selectedIndex = 0;
+  int page = 1;
+  late ScrollController scrollController;
+  @override
+  void initState() {
+    super.initState();
+    scrollController = ScrollController();
+    scrollController.addListener(() {
+      if (scrollController.position.atEdge) {
+        if (scrollController.offset != 0) {
+          setState(() {
+            page++;
+            scrollController.jumpTo(0);
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    scrollController.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-        future: ApiManager.getSources(widget.category.id),
-        builder: (context, snapshot) {
-          if(snapshot.connectionState == ConnectionState.waiting){
-            return Center(child: CircularProgressIndicator(),);
-          }else if(snapshot.hasError || snapshot.data?.status == 'error'){
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-              Text(snapshot.data?.message ?? snapshot.error.toString()),
-              ElevatedButton(onPressed: () {}, child: Text("Try Again"))
-            ],);
-          }else {
-            var sourcesList = snapshot.data?.sources??[];
+    return BlocProvider(
+      create: (context) => CategoryDetailsViewModel()..getSources(widget.category.id),
+      child: BlocBuilder<CategoryDetailsViewModel, CategoryDetailsStates>(
+        buildWhen: (previous, current) =>
+        current is CategoryDetailsInitState ||
+        current is SourcesSuccessState ||
+        current is SourcesErrorState ||
+        current is SourcesLoadingState,
+        builder: (BuildContext context, CategoryDetailsStates state) {
+          CategoryDetailsViewModel categoryDetailsViewModel = BlocProvider.of<CategoryDetailsViewModel>(context);
+          if (state is SourcesSuccessState) {
+            var sourcesList = state.sources;
             return DefaultTabController(
               initialIndex: selectedIndex,
               length: sourcesList.length,
               child: Padding(
                 padding: const EdgeInsets.only(top: 10),
-                child: Column(children: [
-                  TabBar(
-                    onTap: (index) {
-                      selectedIndex = index;
-                      setState((){});
-                    },
-                      indicatorColor: Colors.transparent,
-                      dividerColor: Colors.transparent,
-                      isScrollable: true,
-                      tabs: sourcesList.map((source){
-                        return TabBarItem(source: source, isSelected: selectedIndex == sourcesList.indexOf(source));
-                      }).toList()),
-                  SizedBox(height: 5,),
-                  NewsListWidget(source: sourcesList[selectedIndex]),
-                ],),
+                child: Column(
+                  children: [
+                    TabBar(
+                        onTap: (index) {
+                          selectedIndex = index;
+                          setState(() {
+                            categoryDetailsViewModel.getNews(sourcesList[selectedIndex].id??"", page);
+                          });
+                        },
+                        indicatorColor: Colors.transparent,
+                        dividerColor: Colors.transparent,
+                        isScrollable: true,
+                        tabs: sourcesList.map((source) {
+                          return TabBarItem(
+                              source: source,
+                              isSelected:
+                                  selectedIndex == sourcesList.indexOf(source));
+                        }).toList()),
+                    SizedBox(
+                      height: 5,
+                    ),
+                    NewsListWidget(source: sourcesList[selectedIndex]),
+                  ],
+                ),
               ),
             );
+          } else if (state is SourcesErrorState) {
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(state.errorMessage),
+                ElevatedButton(onPressed: () {}, child: Text("Try Again"))
+              ],
+            );
           }
-        },);
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      ),
+    );
   }
 }
