@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
+import 'package:news_app/DI/di.dart';
 import 'package:news_app/model/category_model/categoeryItemModel.dart';
 import 'package:news_app/shared/reusable_widget/tabBar_Item.dart';
 import 'package:news_app/ui/category_details/view_model/CategoryDetailsViewModel.dart';
@@ -15,34 +17,11 @@ class CategoryDetails extends StatefulWidget {
 
 class _CategoryDetailsState extends State<CategoryDetails> {
   int  selectedIndex = 0;
-  int page = 1;
-  late ScrollController scrollController;
-  @override
-  void initState() {
-    super.initState();
-    scrollController = ScrollController();
-    scrollController.addListener(() {
-      if (scrollController.position.atEdge) {
-        if (scrollController.offset != 0) {
-          setState(() {
-            page++;
-            scrollController.jumpTo(0);
-          });
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    scrollController.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => CategoryDetailsViewModel()..getSources(widget.category.id),
+      create: (context) => getIt.get<CategoryDetailsViewModel>()..getSources(widget.category.id),
       child: BlocBuilder<CategoryDetailsViewModel, CategoryDetailsStates>(
         buildWhen: (previous, current) =>
         current is CategoryDetailsInitState ||
@@ -64,7 +43,7 @@ class _CategoryDetailsState extends State<CategoryDetails> {
                         onTap: (index) {
                           selectedIndex = index;
                           setState(() {
-                            categoryDetailsViewModel.getNews(sourcesList[selectedIndex].id??"", page);
+                            categoryDetailsViewModel.getNews(sourcesList[selectedIndex].id??"");
                           });
                         },
                         indicatorColor: Colors.transparent,
